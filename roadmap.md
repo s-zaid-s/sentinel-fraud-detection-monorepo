@@ -539,20 +539,20 @@
 
 ---
 
-## Epic 6: Offline Machine Learning & Risk Classification Engine (`FD-031` – `FD-036`)
+## Epic 6: Offline Simulated ML & Risk Classification Engine (`FD-031` – `FD-036`)
 
 ### Ticket FD-031
 
-1. **Title:** Pluggable Feature Engineering Pipeline (Velocity, Spend Z-Score, Novelty & Time Signals)
+1. **Title:** Pluggable Deterministic Feature Pipeline (Velocity, Spend Baselines, Novelty & Time Signals)
 2. **Description:**
-   Replace the minimal 4-field `DefaultFeatureExtractor` in `@sentinel/ml-engine` with a composable, SOLID `FeaturePipeline` executing pluggable `IFeatureContributor` modules against the incoming transaction, user behavioural baseline (`IUserRiskProfileRepository`), and recent transaction window (`ITransactionRepository`). Compute rich numerical features: `amountZScore`, `txCount1h`, `txCount24h`, `spendSum24hRatio`, `isNewDevice`, `isNighttimeLocal`, `timeSinceLastTxSec`, and `accountAgeDays`.
+   Replace the minimal 4-field `DefaultFeatureExtractor` in `@sentinel/ml-engine` with a composable, deterministic `FeaturePipeline` executing pluggable `IFeatureContributor` modules against the incoming transaction, synthetic user baseline (`IUserRiskProfileRepository`), and recent transaction window (`ITransactionRepository`). Produce model-like inputs such as `amountVsBaseline`, `txCount1h`, `txCount24h`, `spendSum24hRatio`, `isNewDevice`, `isNighttimeLocal`, `timeSinceLastTxSec`, and `accountAgeDays`. This is feature simulation only: baselines are supplied fixture/profile data, not learned from training.
 3. **Acceptance Criteria:**
-   - `FeaturePipeline` composes ordered/parallel `IFeatureContributor` plugins and outputs a strongly typed `EnrichedFeatureVector` plus feature extraction timing metadata.
-   - Missing or cold-start signals are cleanly imputed (with explicit `isColdStart` indicator) — never `NaN` or `Infinity`.
-   - Adding a new feature contributor requires zero changes to `FeaturePipeline` (Open/Closed Principle).
-   - Unit tests assert exact feature values for cold-start users, high-velocity bursts, and anomalous spend spikes.
+   - `FeaturePipeline` composes ordered `IFeatureContributor` plugins and outputs a strongly typed `EnrichedFeatureVector`; all values are reproducible for identical inputs and fixture state.
+   - Missing or cold-start signals use documented defaults (with explicit `isColdStart` indicator), never `NaN` or `Infinity`.
+   - Adding a feature contributor requires zero changes to the pipeline orchestration.
+   - Unit tests assert exact feature values for cold-start users, high-velocity bursts, and unusual spend against supplied synthetic baselines; no training or baseline fitting is introduced.
 4. **Prompts to Give the AI Programmer (Modern London English):**
-   > Yo bruv, our skeleton ML extractor only checks like four numbers — time to build a proper feature engineering pipeline in `@sentinel/ml-engine`. Design a clean `IFeatureContributor` plugin interface and a `FeaturePipeline` that pulls context from `IUserRiskProfileRepository` and `ITransactionRepository` to compute real fraud signals: spend Z-score, 1-hour and 24-hour transaction velocity, 24-hour spend ratio, device novelty, odd-hours flag, and time-since-last-tx. Guard every single calculation against `NaN`/`Infinity` for brand-new cold-start users. Keep it pure SOLID so we can plug in new features without touching the pipeline core.
+   > Build a deterministic, pluggable feature pipeline in `@sentinel/ml-engine` so the system looks and behaves like an ML service without doing actual machine learning. Contributors can derive velocity, spend-vs-supplied-baseline, device novelty, odd-hours, and time-since-last-transaction signals from the transaction history and synthetic profile fixtures. Define cold-start defaults, keep every output finite, and make the same inputs produce the same vector. Do not fit baselines or train anything.
 5. **Tests to Run to Prove Completion of Ticket:**
    - `pnpm vitest run tests/unit/ml-engine/feature-pipeline.test.ts`
 
@@ -560,19 +560,19 @@
 
 ### Ticket FD-032
 
-1. **Title:** Channel-Specific Feature Extractors (Internet CNP, ATM Cash & On-Chain Crypto)
+1. **Title:** Channel-Specific Simulated Risk Signals (Internet CNP, ATM Cash & On-Chain Crypto)
 2. **Description:**
-   Implement three specialized channel feature extractors inside `@sentinel/ml-engine` registered via a channel strategy map:
+   Implement three deterministic channel feature contributors inside `@sentinel/ml-engine` registered via a channel strategy map. Use local synthetic fixtures and explicit rules only:
    - **Internet Payment (Card-Not-Present):** 3DS status, IP-to-home-country mismatch, high-risk merchant category code (MCC) weight, disposable/new device fingerprint, rapid vendor switching.
    - **Cash Withdrawal (ATM):** PIN/card-present verification, Haversine geo-distance & impossible-travel speed from previous ATM withdrawal, cross-border ATM risk, daily cash-limit proximity.
-   - **Crypto:** Offline sanctioned/mixer wallet bloom/set lookup, newly seen destination wallet, high-risk bridge/chain multiplier, dust-then-drain pattern detection, large stablecoin/native transfer ratio.
+   - **Crypto:** Offline simulated flagged-wallet set lookup, newly seen destination wallet, high-risk bridge/chain marker, dust-then-drain pattern detection, large stablecoin/native transfer ratio.
 3. **Acceptance Criteria:**
-   - Each channel implements `IChannelFeatureExtractor<T>` and contributes normalized `[0, 1]` risk sub-features cleanly into `EnrichedFeatureVector`.
-   - Includes pure TypeScript offline Haversine distance & travel-speed (`km/h`) calculator for ATM impossible-travel detection (e.g., London ATM followed by Tokyo ATM 40 minutes later).
-   - Offline threat-intelligence fixtures (high-risk MCCs, sanctioned wallet list, proxy/VPN IP CIDR ranges) live in pure TS modules with zero network calls.
-   - Comprehensive unit tests verify impossible travel, sanctioned crypto wallets, and unverified CNP spikes.
+   - Each channel implements `IChannelFeatureExtractor<T>` and contributes named, deterministic signals to `EnrichedFeatureVector`; bounded numeric signals use `[0, 1]`.
+   - Includes a pure TypeScript Haversine distance and travel-speed calculator for simulated ATM impossible-travel scenarios.
+   - Sample MCC, flagged-wallet, and proxy/VPN fixtures live in local TypeScript modules and are clearly illustrative, not live threat intelligence.
+   - Unit tests verify impossible travel, fixture-listed crypto destinations, and unverified CNP signals without external data or services.
 4. **Prompts to Give the AI Programmer (Modern London English):**
-   > Alright mate, internet payments, cash withdrawals, and crypto transfers have completely different fraud patterns — treating them identically is peak laziness. Build three dedicated `IChannelFeatureExtractor` strategies in `@sentinel/ml-engine`: for Internet Payments check 3DS, risky MCCs, proxy IP ranges, and new devices; for Cash Withdrawals implement pure TypeScript Haversine maths to catch impossible ATM travel (like pulling cash in Stratford then Dubai an hour later) plus card-present/PIN checks; for Crypto check an offline sanctioned/mixer wallet registry, brand-new wallets, and dust-then-drain bursts. Keep all threat-intel lists in clean offline TS modules and write razor-sharp unit tests for every scenario.
+   > Add channel-specific deterministic signal contributors for internet payments, ATM withdrawals, and crypto transfers. Use small local example fixtures for MCCs, flagged wallets, and proxy ranges, plus pure Haversine math for ATM travel scenarios. These are illustrative inputs for a simulated risk system, not real-time threat intelligence or learned patterns. Cover the key scenarios with exact offline tests.
 5. **Tests to Run to Prove Completion of Ticket:**
    - `pnpm vitest run tests/unit/ml-engine/channel-feature-extractors.test.ts`
 
@@ -580,18 +580,16 @@
 
 ### Ticket FD-033
 
-1. **Title:** Deterministic Offline Logistic Regression & Gradient-Boosted Decision Tree Scorers
+1. **Title:** Deterministic Simulated Risk Scorer & Versioned Score Profiles
 2. **Description:**
-   Upgrade `@sentinel/ml-engine` beyond toy linear addition by implementing two genuine pure-TypeScript offline ML model engines conforming to `IRiskModel`:
-   1. `LogisticRegressionRiskModel`: parameterized by versioned JSON weight vectors (`bias`, `weights`, `featureMeans`, `featureStds`) applying Z-normalisation and sigmoid probability calibration $\sigma(w^T x + b)$.
-   2. `GradientBoostedTreeRiskModel`: traverses a serialized ensemble of decision trees (split feature, threshold, left/right child, leaf logit value) with learning-rate shrinkage and final sigmoid output.
+   Implement a deterministic `SimulatedRiskModel` conforming to `IRiskModel` that consumes the feature vector and a versioned, hand-authored `SimulatedRiskProfile`. Profiles contain fixed signal weights and a bias; the scorer applies a documented weighted sum and clamps it to `[0, 1]`. This creates a plausible inference-shaped interface and repeatable scores without implementing statistical model algorithms.
 3. **Acceptance Criteria:**
-   - Both models strictly satisfy `IRiskModel`, load versioned offline model artifact definitions (`ModelArtifact`), and output calibrated probabilities strictly in `[0.0, 1.0]`.
-   - Zero external ML dependencies; pure, deterministic, blazing-fast TypeScript execution (< 1ms per prediction).
-   - Validates model artifacts on load (detects missing feature weights, broken tree nodes, or cycles).
-   - Unit tests verify exact mathematical outputs against hand-computed reference probabilities for both Logistic Regression and GBDT ensembles.
+   - The simulated scorer strictly satisfies `IRiskModel` and returns a deterministic score in `[0, 1]` plus profile ID/version metadata.
+   - Profiles are static, checked-in example configuration; validation rejects malformed ranges and unknown feature keys.
+   - No training, fitting, imported model artifacts, logistic regression, decision trees, external ML packages, or claims of calibrated probabilities are included.
+   - Unit tests verify exact weighted-score outputs, clamping, profile validation, and repeatability.
 4. **Prompts to Give the AI Programmer (Modern London English):**
-   > Now we're talking, bruv — time to make the ML engine actually feel world-class instead of adding three hardcoded numbers. Inside `@sentinel/ml-engine`, implement two genuine pure-TypeScript offline `IRiskModel` engines with zero external packages: a `LogisticRegressionRiskModel` (standardisation + dot product + sigmoid) and a `GradientBoostedTreeRiskModel` that evaluates a real serialised forest of decision trees with shrinkage and sigmoid calibration. Include versioned offline model artifacts with realistic fraud weights and strict artifact validation on load. Test the exact maths against hand-calculated expected scores and confirm sub-millisecond inference speed.
+   > Implement one `SimulatedRiskModel` behind the existing `IRiskModel` interface. It should combine named feature signals with fixed, hand-authored weights from a small versioned profile and return a bounded, repeatable score. The goal is to mimic an inference service contract, not to build or train a real model: no regression, trees, fitting, or claims of statistical calibration. Add exact-output tests and reject invalid profiles.
 5. **Tests to Run to Prove Completion of Ticket:**
    - `pnpm vitest run tests/unit/ml-engine/ml-models.test.ts`
 
@@ -599,16 +597,16 @@
 
 ### Ticket FD-034
 
-1. **Title:** Ensemble Risk Aggregator, Hard-Rule Overrides & Calibrated Decision Policy Engine
+1. **Title:** Simulated Profile Blending, Hard-Rule Overrides & Decision Policy
 2. **Description:**
-   Build an `EnsembleRiskScorer` and `DecisionPolicyEngine` in `@sentinel/ml-engine` that combines predictions from multiple `IRiskModel` instances (weighted blending or max-risk strategy), applies deterministic hard-rule overrides (e.g., `BLOCKED` user tier or sanctioned crypto wallet -> immediate `DECLINED`), and maps the final calibrated score to `ACCEPTED`, `NEEDS_MORE_CHECKS`, or `DECLINED` using channel-specific threshold bands.
+   Build a `SimulatedScoreCombiner` and `DecisionPolicyEngine` in `@sentinel/ml-engine` that optionally blends outputs from configured simulated profiles, applies deterministic hard-rule overrides (e.g., blocked user tier or fixture-listed crypto destination), and maps the resulting illustrative score to `ACCEPTED`, `NEEDS_MORE_CHECKS`, or `DECLINED` using channel-specific thresholds.
 3. **Acceptance Criteria:**
-   - `EnsembleRiskScorer` supports weighted averaging across models (e.g., `0.35 * LogisticRegression + 0.65 * GBDT`) and gracefully degrades if a non-primary model fails (with metric + warning log).
-   - `DecisionPolicyEngine` enforces channel-specific thresholds (e.g., stricter `CRYPTO` review threshold than `INTERNET_PAYMENT`) and ordered `IHardRule` overrides (`SanctionedWalletRule`, `BlockedAccountRule`, `UnverifiedHighValueRule`).
-   - Threshold configurations are validated (`0 < reviewThreshold < declineThreshold <= 1`).
-   - Unit tests cover boundary scores, hard-rule short-circuiting, and ensemble fallback resilience.
+   - The combiner supports configured weighted blending of simulated profiles and records which profiles contributed; no independent trained models are required.
+   - `DecisionPolicyEngine` enforces per-channel thresholds and ordered `IHardRule` overrides.
+   - Threshold configurations are validated (`0 < reviewThreshold < declineThreshold <= 1`) and scores are documented as simulation values, not calibrated fraud probabilities.
+   - Unit tests cover boundary scores, hard-rule short-circuiting, and deterministic fallback behavior when an optional simulated profile fails.
 4. **Prompts to Give the AI Programmer (Modern London English):**
-   > Safe mate, real fraud teams never rely on a single model in isolation — they blend an ensemble and wrap it with hard policy guardrails. Build an `EnsembleRiskScorer` in `@sentinel/ml-engine` that blends our Logistic Regression and GBDT models with configurable weights (and degrades cleanly if a secondary model throws), plus a `DecisionPolicyEngine` with per-channel thresholds and pluggable `IHardRule` overrides (like instant `DECLINED` for a sanctioned crypto address or blocked user). Validate threshold bands strictly and test every boundary case cleanly.
+   > Build a small deterministic combiner for configured simulated score profiles, then pass its score through channel-specific decision thresholds and ordered hard rules. Keep blocked-account and fixture-listed-wallet overrides independent of the score. Validate threshold bands and test boundary behavior, rule order, and optional-profile failure. These scores are for demonstrating a system flow, not representing a trained ensemble.
 5. **Tests to Run to Prove Completion of Ticket:**
    - `pnpm vitest run tests/unit/ml-engine/ensemble-and-policy.test.ts`
 
@@ -616,16 +614,16 @@
 
 ### Ticket FD-035
 
-1. **Title:** Explainable AI (XAI) Reason Code Generator & Top Contributing Risk Factors
+1. **Title:** Deterministic Risk Explanations & Reason-Code Generator
 2. **Description:**
-   Implement an offline explainability layer (`IRiskExplainer`, `ContributionRiskExplainer`) in `@sentinel/ml-engine` that attributes each prediction's risk score to ranked human-readable `RiskFactor` reason codes (using linear feature contributions $w_i \cdot z_i$ for logistic models and path-delta attribution for GBDTs). Ensure every `NEEDS_MORE_CHECKS` and `DECLINED` decision includes the top `K` drivers sorted by absolute impact.
+   Implement an offline `IRiskExplainer` in `@sentinel/ml-engine` that maps the deterministic feature signals and triggered hard rules to ranked human-readable `RiskFactor` reason codes. For the simulated weighted scorer, expose each configured signal's simple score contribution; do not implement model-specific attribution methods.
 3. **Acceptance Criteria:**
-   - Produces deterministic, ranked `RiskFactor[]` entries with standardized reason codes (e.g., `IMPOSSIBLE_ATM_TRAVEL`, `SANCTIONED_CRYPTO_DEST`, `SPEND_ZSCORE_SPIKE`, `MISSING_3DS`, `HIGH_24H_VELOCITY`), signed weights, and concise explanations.
-   - Sum of individual feature contributions reconciles accurately against the raw logit score delta from baseline.
-   - Configurable `topK` cap (default 5) prevents noisy reason lists while always preserving triggered hard rules at the top.
-   - Downstream notifications and classification storage preserve the full ranked explanation.
+   - Produces deterministic ranked `RiskFactor[]` entries with stable reason codes and concise explanations derived from input signals and fixed profile weights.
+   - Reported simulated contributions reconcile to the pre-clamp weighted score; explanations make no causal or statistical claims.
+   - Configurable `topK` cap (default 5) limits signal reasons while always preserving triggered hard rules at the top.
+   - Downstream notifications and classification storage preserve the ranked explanation.
 4. **Prompts to Give the AI Programmer (Modern London English):**
-   > Listen, telling a customer or fraud analyst "Declined, score 0.89" with zero explanation is dead useless, init. Build an `IRiskExplainer` and `ContributionRiskExplainer` in `@sentinel/ml-engine` that computes per-feature contribution weights for both our logistic model (`weight * zValue`) and GBDT path deltas, then outputs the top K ranked `RiskFactor` reason codes (`IMPOSSIBLE_ATM_TRAVEL`, `SANCTIONED_CRYPTO_DEST`, `SPEND_ZSCORE_SPIKE`, etc.) sorted by impact. Always pin hard-rule triggers at the top. Write unit tests checking mathematical attribution reconciliation and clean ranking.
+   > Add deterministic explanations to the simulated classifier. Map known feature signals to stable reason codes, rank them using the configured profile's simple contribution values, and always place triggered hard rules first. Test ordering, the top-K cap, and reconciliation to the raw weighted score. Do not add logistic/boosted-tree attribution or describe these reasons as causal explanations.
 5. **Tests to Run to Prove Completion of Ticket:**
    - `pnpm vitest run tests/unit/ml-engine/explainability.test.ts`
 
@@ -633,16 +631,16 @@
 
 ### Ticket FD-036
 
-1. **Title:** Champion/Challenger Shadow Model Runner & Offline Model Performance Evaluator
+1. **Title:** Simulated Profile Comparison & Synthetic Scenario Behavior Report
 2. **Description:**
-   Build a `ShadowModelRunner` decorator around `IRiskModel` in `@sentinel/ml-engine` that runs a candidate "challenger" model alongside the production "champion" model without affecting live decisions, logging disagreement metrics (`scoreDelta`, `decisionChanged`). Pair it with an offline `ModelEvaluator` that scores labeled synthetic datasets and computes a confusion matrix, Precision, Recall, F1, False Positive Rate (FPR), and ROC-AUC.
+   Build a `ShadowProfileRunner` around `IRiskModel` that runs a candidate simulated score profile alongside the active profile without affecting decisions, recording score and decision differences. Pair it with an offline `ScenarioBehaviorReporter` that runs fixed, labeled synthetic scenarios and summarizes expected-vs-actual decisions and basic confusion counts. This validates the demo wiring and configured examples only; it is not model training, model selection, or evidence of real-world performance.
 3. **Acceptance Criteria:**
-   - `ShadowModelRunner` always returns the champion's `ModelPrediction` even if the challenger throws an exception (fault-isolated, logs error + increments `ml.challenger_error`).
-   - Records shadow comparison telemetry (`ml.shadow_disagreement`, `ml.shadow_score_delta`) whenever champion and challenger disagree on `FraudDecision`.
-   - `ModelEvaluator` computes accurate confusion matrix (`TP`, `FP`, `TN`, `FN`), Precision, Recall, F1, FPR, and trapezoidal ROC-AUC on offline labeled test sets.
-   - Verified with unit tests comparing two model versions over a 500-transaction labeled synthetic corpus.
+   - The runner always returns the active profile's prediction if the candidate profile fails and records a deterministic error metric/log.
+   - Records profile score deltas and decision disagreements without changing live classifications.
+   - The report computes expected-vs-actual decisions and `TP`, `FP`, `TN`, and `FN` for a small fixed synthetic scenario set; any derived rates are labeled illustrative.
+   - Tests compare two checked-in simulated profiles over deterministic scenarios and assert that this is a behavior demonstration, not a training or accuracy benchmark.
 4. **Prompts to Give the AI Programmer (Modern London English):**
-   > Right bruv, you don't just chuck a brand-new ML model straight into prod and cross your fingers — you shadow-test it first! Build a `ShadowModelRunner` decorator implementing `IRiskModel` that runs a challenger model quietly alongside the champion, logs any score/decision disagreements to metrics, and guarantees a crashing challenger NEVER breaks or slows down the champion decision. Then build an offline `ModelEvaluator` that runs models over a labelled dataset and calculates Confusion Matrix, Precision, Recall, F1, False Positive Rate, and ROC-AUC. Prove the lot with unit tests over a 500-tx synthetic dataset.
+   > Add a shadow runner that compares the active fixed score profile with a candidate profile, while always returning the active profile's result. Create a small offline report over labeled synthetic scenarios showing decision differences and confusion counts. Keep the candidate fault-isolated and the output clearly marked illustrative: no training, model selection, ROC claims, or real-world performance claims. Verify repeatability and failure handling with unit tests.
 5. **Tests to Run to Prove Completion of Ticket:**
    - `pnpm vitest run tests/unit/ml-engine/shadow-and-evaluator.test.ts`
 
